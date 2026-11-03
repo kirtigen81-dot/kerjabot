@@ -1,0 +1,7 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "regions": ["sin1"],
+  "functions": {
+    "app/api/chat/route.ts": { "memory": 1024, "maxDuration": 60 }
+  }
+}
