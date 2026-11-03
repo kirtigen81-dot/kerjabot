@@ -7,23 +7,19 @@
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import OpenAI from "openai";
 import type {
   ChatCompletionMessageParam,
   ChatCompletionTool,
 } from "openai/resources/chat/completions";
 import { AbortedError, JOBS_AVAILABLE, JobSiteSession, searchKey, type Credentials } from "./browser";
 import * as ace from "./ace";
+import { deepseek } from "./deepseek";
 import type { AgentEvent, Emit, Fit, JobItem, JobsPayload } from "./events";
 import * as memory from "./memory";
 
 export type ChatTurn = { role: "user" | "assistant"; content: string };
 export type { AgentEvent };
 
-const deepseek = new OpenAI({
-  apiKey: process.env.DEEPSEEK_API_KEY,
-  baseURL: process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com",
-});
 const MODEL = process.env.DEEPSEEK_MODEL || "deepseek-flash";
 const MAX_TOOL_ROUNDS = 4; // then one final call with tool_choice "none"
 const MAX_JOB_DETAILS = 3; // job_details calls per request
@@ -211,7 +207,7 @@ async function streamTurn(
   signal: AbortSignal | undefined,
   toolChoice: "auto" | "none",
 ): Promise<StreamedTurn> {
-  const stream = await deepseek.chat.completions.create(
+  const stream = await deepseek().chat.completions.create(
     {
       model: MODEL,
       messages: msgs,
@@ -507,7 +503,7 @@ PAGE TEXT:
 ${input.pageText.slice(0, 12_000)}`;
 
   try {
-    const res = await deepseek.chat.completions.create(
+    const res = await deepseek().chat.completions.create(
       {
         model: MODEL,
         messages: [{ role: "user", content: prompt }],
@@ -577,7 +573,7 @@ Return JSON with keys:
   "history_note": one line describing this turn worth remembering, or "" if nothing.`;
 
   try {
-    const res = await deepseek.chat.completions.create({
+    const res = await deepseek().chat.completions.create({
       model: MODEL,
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },

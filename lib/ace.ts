@@ -13,7 +13,7 @@
  */
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import OpenAI from "openai";
+import { deepseek } from "./deepseek";
 import * as memory from "./memory";
 
 // ---------- types ----------
@@ -53,11 +53,6 @@ const MAX_BULLETS = Number(process.env.ACE_MAX_BULLETS) || 80;
 const BULLETS_IN_PROMPT = Number(process.env.ACE_BULLETS_IN_PROMPT) || 15;
 const SIMILAR = 0.75; // token-Jaccard threshold for "same lesson"
 const MAX_CONTENT = 240;
-
-const llm = new OpenAI({
-  apiKey: process.env.DEEPSEEK_API_KEY,
-  baseURL: process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com",
-});
 
 const emptyPlaybook = (): Playbook => ({ version: 0, nextId: 1, bullets: [] });
 
@@ -261,7 +256,7 @@ export function detectSignals(userMessage: string, steps: TrajectoryStep[], prev
 // ---------- reflector ----------
 
 async function json<T>(prompt: string, temperature: number): Promise<T> {
-  const res = await llm.chat.completions.create({
+  const res = await deepseek().chat.completions.create({
     model: MODEL,
     messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" },
