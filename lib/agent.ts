@@ -11,7 +11,7 @@ import type {
   ChatCompletionMessageParam,
   ChatCompletionTool,
 } from "openai/resources/chat/completions";
-import { AbortedError, JOBS_AVAILABLE, JobSiteSession, searchKey, type Credentials } from "./browser";
+import { AbortedError, BLOCKED_MESSAGE, JOBS_AVAILABLE, JobSiteSession, searchKey, type Credentials } from "./browser";
 import * as ace from "./ace";
 import { deepseek } from "./deepseek";
 import type { AgentEvent, Emit, Fit, JobItem, JobsPayload } from "./events";
@@ -356,6 +356,8 @@ export async function runAgent(opts: {
               result = { ok: false, message: `Unknown tool ${name}` };
             } else {
               result = { ok: snap.ok, message: snap.message, page_text: snap.text };
+              // Firewall page: no point trying other tools – explain it now
+              if (snap.message === BLOCKED_MESSAGE) forceAnswer = true;
               if (snap.ok && (name === "search_jobs" || name === "read_jobs")) searched.set(`${name === "read_jobs" ? "read" : "search"}|${key}`, result);
               // Search + job details done -> the next DeepSeek call must write the answer
               if (snap.ok && (name === "job_details" || name === "more_results" || (name === "read_jobs" && snap.text.includes("### JOB")))) {

@@ -47,6 +47,13 @@ export type Credentials = { icNumber: string; password: string };
 export type PageSnapshot = { text: string; screenshot: string; url: string };
 type Result = PageSnapshot & { ok: boolean; message?: string };
 
+/** The MYFutureJobs firewall page: "CLIENT IP: 1.2.3.4 RAY ID: …" */
+const BLOCK_PAGE = /RAY ID/i;
+export const BLOCKED_MESSAGE =
+  "SITE_BLOCKED: MYFutureJobs is showing its security page (CLIENT IP / RAY ID) instead of the website, so it is blocking access from this network for now. Do NOT call any more tools. Tell the user the site is temporarily blocking KerjaBot, to try again later (e.g. in 30–60 minutes), and that they can search directly on myfuturejobs.gov.my meanwhile.";
+
+class SiteBlockedError extends Error {}
+
 export class AbortedError extends Error {
   constructor() {
     super("Stopped by user");
@@ -60,6 +67,8 @@ export class JobSiteSession {
   private cdp?: CDPSession;
   private frameTimer?: ReturnType<typeof setTimeout>;
   private loggedIn = false;
+  /** set once the firewall page was seen; every later call fails fast */
+  private blocked = false;
   private stepSeq = 0;
   private sent = { screenshots: 0, frames: 0 };
   /** The search currently shown on the page, so job_details can reuse it instead of searching again. */
@@ -240,14 +249,26 @@ export class JobSiteSession {
 
   // ---------- site flows ----------
 
+  /** True when the site's firewall shows its security page ("CLIENT IP … RAY ID …") instead of content. */
+  private async isBlocked(page: Page) {
+    return page.getByText(BLOCK_PAGE).first().isVisible().catch(() => false);
+  }
+
   async login(): Promise<{ ok: boolean; message: string }> {
     if (this.loggedIn) return { ok: true, message: "Already logged in." };
+    if (this.blocked) return { ok: false, message: BLOCKED_MESSAGE };
     const page = await this.getPage();
+
+    const blocked = () => {
+      this.blocked = true;
+      return { ok: false, message: BLOCKED_MESSAGE };
+    };
 
     await this.step("Going to myfuturejobs.gov.my", async () => {
       await page.goto(HOME_URL, { waitUntil: "domcontentloaded" });
       await page.waitForTimeout(800);
     });
+    if (await this.isBlocked(page)) return blocked();
 
     const ic = page.locator(SELECTORS.icInput).first();
     try {
@@ -260,10 +281,13 @@ export class JobSiteSession {
         if (href) await page.goto(new URL(href, page.url()).toString(), { waitUntil: "domcontentloaded" });
         else await link.click();
         this.emit({ type: "highlight", box: null });
-        await ic.waitFor();
+        // Either the login form or the firewall page – don't wait 20s for a form that will never come
+        await ic.or(page.getByText(BLOCK_PAGE)).first().waitFor();
+        if (await this.isBlocked(page)) throw new SiteBlockedError();
       });
     } catch (err) {
       if (err instanceof AbortedError) throw err;
+      if (err instanceof SiteBlockedError) return blocked();
       return { ok: false, message: "Could not open the login page (Login button or IC field not found)." };
     }
 
