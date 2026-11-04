@@ -1,4 +1,4 @@
-import { runAgent, type ChatTurn } from "@/lib/agent";
+import type { ChatTurn } from "@/lib/agent";
 import type { AgentEvent } from "@/lib/events";
 import { sanitizeSkills } from "@/lib/skills";
 
@@ -25,6 +25,15 @@ export async function POST(req: Request) {
     return new Response("messages required", { status: 400 });
   }
 
+  // Loaded here (not at the top) so a failing dependency gives a readable error instead of an empty 500
+  let runAgent: typeof import("@/lib/agent").runAgent;
+  try {
+    ({ runAgent } = await import("@/lib/agent"));
+  } catch (err) {
+    console.error("[chat] failed to load the agent:", err);
+    return new Response(`Server error while starting KerjaBot: ${(err as Error).message}`, { status: 500 });
+  }
+
   const creds =
     body.credentials?.icNumber && body.credentials?.password
       ? { icNumber: String(body.credentials.icNumber), password: String(body.credentials.password) }
@@ -36,7 +45,7 @@ export async function POST(req: Request) {
 
   // Aborts when the client presses Stop (fetch aborted) or the connection drops.
   const abort = new AbortController();
-  req.signal.addEventListener("abort", () => abort.abort(), { once: true });
+  req.signal?.addEventListener("abort", () => abort.abort(), { once: true });
 
   const enc = new TextEncoder();
   const started = Date.now();

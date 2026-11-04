@@ -11,7 +11,8 @@
  *   - on Vercel               -> @sparticuz/chromium (serverless Chromium)
  *   - local dev               -> your installed Google Chrome (window visible if BROWSER_HEADFUL=true)
  */
-import { chromium, type Browser, type CDPSession, type Locator, type Page } from "playwright-core";
+// Types only: playwright-core is loaded in launch(), so a broken browser install can't crash normal chat
+import type { Browser, CDPSession, Locator, Page } from "playwright-core";
 import { VIEWPORT, type Emit } from "./events";
 
 const HOME_URL = "https://myfuturejobs.gov.my/";
@@ -150,6 +151,7 @@ export class JobSiteSession {
   // ---------- browser lifecycle ----------
 
   private async launch(): Promise<Browser> {
+    const { chromium } = await import("playwright-core");
     const ws = process.env.BROWSER_WS_ENDPOINT;
     if (ws) return chromium.connectOverCDP(ws);
 
