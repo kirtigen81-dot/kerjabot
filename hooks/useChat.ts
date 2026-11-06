@@ -225,7 +225,7 @@ export function useChat() {
                   }
                 : m,
             )
-            .filter((m) => m.role === "user" || m.content || m.steps?.length || m.jobs),
+            .filter((m) => m.role === "user" || m.content || m.steps?.some((s) => s.id.startsWith("b")) || m.jobs),
         );
       }
     },
